@@ -12,11 +12,42 @@
 #include "FS.h"
 #include "SD_MMC.h"
 
+//time libraries
+#include <WiFi.h>
+#include "time.h"
+
+
+const char* ssid     = "TEdata8D4EBC";
+const char* password = "21916283";
+
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 0;
+const int   daylightOffset_sec = 3600;
+
+
 ESP32QRCodeReader reader(CAMERA_MODEL_AI_THINKER);
 struct QRCodeData qrCodeData;
 
-int pictureNumber = 0;
 
+String printLocalTime(){
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    return "Failed to obtain time";
+  }
+  
+  char timeYYYYMMDD[11];
+  strftime(timeYYYYMMDD,11, "%F", &timeinfo);
+  Serial.println(timeYYYYMMDD);
+
+  char timeHH[3];
+  strftime(timeHH,3, "%H", &timeinfo);
+  char timeMM[3];
+  strftime(timeMM,3, "%M", &timeinfo);
+
+  String path = "/" + String(timeYYYYMMDD) +"-"+ String(timeHH)+ +"-"+ String(timeMM)+"QR"+ ".jpg";
+  return path;
+  
+}
 
 void initMicroSDCard() {
   // Start the MicroSD card
@@ -82,6 +113,25 @@ void setup() {
   Serial.begin(115200);
   Serial.println();
 
+  // Connect to Wi-Fi
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected.");
+  
+  // Init and get the time
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  String path= printLocalTime();
+
+  //disconnect WiFi as it's no longer needed
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+
   reader.setup();
   Serial.println("Setup QRCode Reader");
 
@@ -106,7 +156,7 @@ void loop() {
       Serial.print("Payload: ");
       Serial.println((const char *)qrCodeData.payload);
       // Path where new picture will be saved in SD Card
-      String path = "/image" + String(pictureNumber++) + ".jpg";
+      String path= printLocalTime();
       Serial.printf("Picture file name: %s\n", path.c_str());
       
       // Take and Save Photo
